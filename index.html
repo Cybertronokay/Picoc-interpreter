@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PicoC Interpreter</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css" />
+  <style>
+    :root {
+      --text-color: #000;
+      --bg-opacity: rgba(255, 255, 255, 0.85);
+    }
+
+    body.dark {
+      --text-color: #f8fafc;
+      --bg-opacity: rgba(30, 41, 59, 0.85);
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #dfe9f3 0%, #ffffff 100%);
+      background-attachment: fixed;
+      background-size: cover;
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      transition: background 0.5s ease;
+      padding-top: 30px;
+    }
+
+    body.dark {
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    }
+
+    .overlay {
+      background: var(--bg-opacity);
+      backdrop-filter: blur(10px);
+      padding: 40px;
+      border-radius: 16px;
+      max-width: 800px;
+      width: 90%;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      z-index: 1;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .welcome {
+      text-align: center;
+      font-style: italic;
+      margin-bottom: 10px;
+    }
+
+    .mode-indicator {
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+
+    .theme-toggle {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .theme-toggle button {
+      padding: 8px 16px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+    }
+
+    #drop-zone {
+      border: 2px dashed #aaa;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      margin: 20px 0;
+      color: #666;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    button[type="submit"],
+    #runEditor,
+    #resetBtn {
+      display: block;
+      margin-top: 10px;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .alert {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 6px;
+      display: none;
+    }
+
+    .alert-success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .alert-error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+
+    .output-box {
+      margin-top: 20px;
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+
+    body.dark .output-box {
+      background: #1e1e1e;
+    }
+
+    #editor {
+      height: 200px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
+    svg.wave-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Decorative Background SVG -->
+  <svg class="wave-bg" viewBox="0 0 1440 320">
+    <path fill="#ffffff22" fill-opacity="0.4"
+      d="M0,192L60,197.3C120,203,240,213,360,208C480,203,600,181,720,176C840,171,960,181,1080,181.3C1200,181,1320,171,1380,165.3L1440,160L1440,0L1380,0C1320,0,1200,0,1080,0C960,0,840,0,720,0C600,0,480,0,360,0C240,0,120,0,60,0L0,0Z" />
+  </svg>
+
+  <div class="overlay">
+
+    <!-- 🌗 Theme Toggle (Inside Overlay) -->
+    <div class="theme-toggle">
+      <button id="themeButton">🌙 Dark</button>
+    </div>
+
+    <h2>PicoC Interpreter</h2>
+    <div class="welcome">Welcome! Upload a file or write PicoC code directly below.</div>
+
+    <div class="mode-indicator" id="modeIndicator">Mode: Editor</div>
+
+    <div id="drop-zone">Drag and drop a <code>.txt</code> file here or click to browse
+      <input type="file" id="fileInput" accept=".txt" />
+    </div>
+
+    <textarea id="editor">// Write your PicoC code here</textarea>
+
+    <button id="runEditor">Run Code</button>
+    <button id="resetBtn">🔁 Reset</button>
+
+    <form id="interpreterForm" enctype="multipart/form-data" style="display: none;">
+      <input type="file" id="hiddenFileInput" />
+    </form>
+
+    <div id="alertBox" class="alert"></div>
+    <div class="output-box" id="outputBox" style="display:none;">
+      <pre><code id="outputContent" class="language-c"></code></pre>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
+
+  <script>
+    const editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+      lineNumbers: true,
+      mode: "text/x-csrc",
+      theme: "default"
+    });
+
+    const fileInput = document.getElementById("fileInput");
+    const alertBox = document.getElementById("alertBox");
+    const outputBox = document.getElementById("outputBox");
+    const outputContent = document.getElementById("outputContent");
+    const modeIndicator = document.getElementById("modeIndicator");
+
+    function showAlert(message, isSuccess) {
+      alertBox.textContent = message;
+      alertBox.className = "alert " + (isSuccess ? "alert-success" : "alert-error");
+      alertBox.style.display = "block";
+    }
+
+    function setThemeMode(isDark) {
+      document.body.classList.toggle("dark", isDark);
+      document.getElementById("themeButton").textContent = isDark ? "☀ Light" : "🌙 Dark";
+    }
+
+    function toggleTheme() {
+      const isDark = !document.body.classList.contains("dark");
+      setThemeMode(isDark);
+    }
+
+    document.getElementById("themeButton").addEventListener("click", toggleTheme);
+
+    window.onload = () => {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setThemeMode(prefersDark);
+    };
+
+    document.getElementById("runEditor").addEventListener("click", () => {
+      const code = editor.getValue();
+      fetch("http://127.0.0.1:5000/evaluate_code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code })
+      })
+        .then(res => res.json())
+        .then(data => {
+          const isError = data.output.startsWith("Compilation Error") || data.output.startsWith("Runtime Error");
+          showAlert(isError ? "Errors found during evaluation." : "Code evaluated successfully!", !isError);
+          outputContent.textContent = data.output;
+          Prism.highlightElement(outputContent);
+          outputBox.style.display = "block";
+          modeIndicator.textContent = "Mode: Editor";
+        })
+        .catch(err => {
+          showAlert("Error: " + err.message, false);
+        });
+    });
+
+    function handleFileUpload(file) {
+      const formData = new FormData();
+      formData.append("file", file);
+      fileInput.value = '';
+
+      fetch("http://127.0.0.1:5000/evaluate", {
+        method: "POST",
+        body: formData,
+      })
+        .then(res => res.json())
+        .then(data => {
+          const isError = data.output.startsWith("Compilation Error") || data.output.startsWith("Runtime Error");
+          showAlert(isError ? "Errors found during evaluation." : "Code evaluated successfully!", !isError);
+          outputContent.textContent = data.output;
+          Prism.highlightElement(outputContent);
+          outputBox.style.display = "block";
+          modeIndicator.textContent = "Mode: File Upload";
+        })
+        .catch(err => {
+          showAlert("Error: " + err.message, false);
+        });
+    }
+
+    document.getElementById("drop-zone").addEventListener("click", () => fileInput.click());
+    document.getElementById("drop-zone").addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.currentTarget.style.borderColor = "#007bff";
+    });
+    document.getElementById("drop-zone").addEventListener("dragleave", (e) => {
+      e.currentTarget.style.borderColor = "#aaa";
+    });
+    document.getElementById("drop-zone").addEventListener("drop", (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (file && file.name.endsWith(".txt")) {
+        handleFileUpload(file);
+      } else {
+        showAlert("Please drop a valid .txt file", false);
+      }
+    });
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (file) handleFileUpload(file);
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      editor.setValue("// Write your PicoC code here");
+      alertBox.style.display = "none";
+      outputBox.style.display = "none";
+      outputContent.textContent = "";
+      modeIndicator.textContent = "Mode: Editor";
+    });
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
